@@ -8,6 +8,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -83,7 +84,6 @@
   }
 
   .nav-logo span.accent { color: var(--blue-bright); }
-
   .nav-right { display: flex; align-items: center; gap: 1rem; }
 
   .nav-btn {
@@ -237,6 +237,14 @@
   .empty-state h3 { font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
   .empty-state p { font-size: 0.85rem; color: var(--text-muted); }
 
+  .loading-state { grid-column: 1/-1; text-align: center; padding: 5rem 2rem; }
+  .spinner {
+    width: 40px; height: 40px; border: 3px solid var(--border);
+    border-top-color: var(--blue-bright); border-radius: 50%;
+    animation: spin 0.8s linear infinite; margin: 0 auto 1rem;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .modal-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px);
     z-index: 200; display: flex; align-items: center; justify-content: center;
@@ -347,6 +355,7 @@
 
   .btn-primary:hover { background: var(--blue-bright); transform: translateY(-1px); }
   .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
   .btn-danger {
     font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: 4px;
@@ -391,7 +400,6 @@
   .login-card h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
   .login-card p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 2rem; }
 
-  /* GDRIVE CONVERTER BOX */
   .gdrive-box {
     background: linear-gradient(135deg, rgba(30,144,255,0.06), rgba(37,99,235,0.04));
     border: 1px solid rgba(30,144,255,0.25);
@@ -406,20 +414,11 @@
     letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 10px;
   }
 
-  .gdrive-box-title .gdrive-icon { font-size: 1rem; }
-
   .gdrive-converted {
-    margin-top: 10px;
-    padding: 10px 12px;
-    background: rgba(34,197,94,0.08);
-    border: 1px solid rgba(34,197,94,0.25);
-    border-radius: 6px;
-    font-size: 0.78rem;
-    color: #86efac;
-    word-break: break-all;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
+    margin-top: 10px; padding: 10px 12px;
+    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 6px; font-size: 0.78rem; color: #86efac;
+    word-break: break-all; display: flex; align-items: flex-start; gap: 8px;
   }
 
   .gdrive-converted span { flex: 1; }
@@ -458,8 +457,16 @@
     color: var(--text-muted); font-size: 0.78rem;
   }
 
-  .divider-text::before, .divider-text::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
+  .divider-text::before, .divider-text::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .db-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 12px;
+    background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); color: #86efac;
+  }
+
+  .db-badge.offline {
+    background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.25); color: #fca5a5;
   }
 
   @media (max-width: 768px) {
@@ -479,7 +486,12 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback } = React;
 
-// ─── GOOGLE DRIVE CONVERTER ───────────────────────────
+// ─── SUPABASE CONFIG ──────────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://xfknfriidrpaoyxyfehq.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhma25mcmlpZHJwYW95eHlmZWhxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NTA1ODAsImV4cCI6MjA5NTAyNjU4MH0.mYZS6W1t8ICVWTFtB88gNKPvRD3qZMMtlXwCDBrN7Tw';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ─── GOOGLE DRIVE HELPERS ─────────────────────────────────────────────────────
 function extractGDriveId(input) {
   if (!input) return null;
   const patterns = [
@@ -494,14 +506,6 @@ function extractGDriveId(input) {
   return null;
 }
 
-function convertGDriveLink(input) {
-  if (!input) return null;
-  if (input.includes('drive.google.com/uc?') || input.includes('export=download')) return input;
-  const fileId = extractGDriveId(input);
-  if (fileId) return `https://drive.google.com/uc?export=download&id=${fileId}`;
-  return null;
-}
-
 function getGDriveEmbedUrl(url) {
   if (!url) return null;
   const fileId = extractGDriveId(url);
@@ -513,9 +517,7 @@ function isGDriveLink(url) {
   return url && url.includes('drive.google.com');
 }
 
-// ─── DEMO DATA ────────────────────────────────────────
-const DEMO_CLIPS = [];
-
+// ─── HEROES ───────────────────────────────────────────────────────────────────
 const HEROES = [
   "All",
   "Aamon","Akai","Aldous","Alice","Alpha","Alucard","Angela","Argus","Arlott",
@@ -537,7 +539,7 @@ const HEROES = [
 ];
 
 const HERO_COLORS = {
-  Miya:"#60a5fa",Balmond:"#b91c1c",Saber:"#06b6d4",Alice:"#7e22ce",
+  Nolan:"#1d4ed8",Miya:"#60a5fa",Balmond:"#b91c1c",Saber:"#06b6d4",Alice:"#7e22ce",
   Nana:"#f472b6",Tigreal:"#eab308",Alucard:"#dc2626",Karina:"#4338ca",
   Akai:"#16a34a",Franco:"#1e3a8a",Bane:"#0f766e",Bruno:"#f97316",
   Clint:"#92400e",Rafaela:"#fde68a",Eudora:"#2563eb",Zilong:"#2563eb",
@@ -567,13 +569,13 @@ const HERO_COLORS = {
   Aulus:"#d97706",Aamon:"#06b6d4",Valentina:"#14532d",Edith:"#6b7280",
   Floryn:"#22c55e",Yin:"#f97316",Melissa:"#ec4899",Xavier:"#2563eb",
   Julian:"#4f46e5",Fredrinn:"#57534e",Joy:"#eab308",Novaria:"#7c3aed",
-  Arlott:"#7f1d1d",Ixia:"#0ea5e9",Nolan:"#1d4ed8",Cici:"#fb7185",
+  Arlott:"#7f1d1d",Ixia:"#0ea5e9",Cici:"#fb7185",
   Chip:"#14b8a6",Zhuxin:"#9333ea",Suyou:"#374151",Lukas:"#f59e0b",
   Kalea:"#0891b2",Zetian:"#7c3aed",Obsidia:"#111827",Sora:"#38bdf8",
   Marcel:"#a855f7",
 };
 
-// ─── ICONS ────────────────────────────────────────────
+// ─── ICONS ────────────────────────────────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
     <path d={d} />
@@ -587,21 +589,8 @@ const FilmIcon = () => <Icon d="M15 10l4.553-2.277A1 1 0 0 1 21 8.68V15.32a1 1 0
 const TrashIcon = () => <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" size={14} />;
 const EditIcon = () => <Icon d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" size={14} />;
 const CheckIcon = () => <Icon d="M20 6L9 17l-5-5" size={14} />;
-const LinkIcon = () => <Icon d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" size={14} />;
 
-// ─── STORAGE ─────────────────────────────────────────
-const getClips = () => {
-  try {
-    const stored = localStorage.getItem('mlbb_clips_v2');
-    return stored ? JSON.parse(stored) : DEMO_CLIPS;
-  } catch { return DEMO_CLIPS; }
-};
-
-const saveClips = (clips) => {
-  try { localStorage.setItem('mlbb_clips_v2', JSON.stringify(clips)); } catch {}
-};
-
-// ─── TOAST ───────────────────────────────────────────
+// ─── TOAST ────────────────────────────────────────────────────────────────────
 function Toast({ message, onDone }) {
   useEffect(() => {
     const t = setTimeout(onDone, 2500);
@@ -610,7 +599,7 @@ function Toast({ message, onDone }) {
   return <div className="toast"><CheckIcon /> {message}</div>;
 }
 
-// ─── GDRIVE CONVERTER COMPONENT ──────────────────────
+// ─── GDRIVE CONVERTER ─────────────────────────────────────────────────────────
 function GDriveConverter({ onConverted }) {
   const [input, setInput] = useState('');
   const [fileId, setFileId] = useState('');
@@ -619,11 +608,9 @@ function GDriveConverter({ onConverted }) {
   const handleConvert = (val) => {
     setInput(val);
     if (!val) { setFileId(''); onConverted(''); return; }
-
     const id = extractGDriveId(val);
     if (id) {
       setFileId(id);
-      // Store the download URL — embed URL derived at display time
       onConverted(`https://drive.google.com/uc?export=download&id=${id}`);
     } else if (val.startsWith('http')) {
       setFileId('');
@@ -633,7 +620,6 @@ function GDriveConverter({ onConverted }) {
     }
   };
 
-  const embedUrl = fileId ? `https://drive.google.com/file/d/${fileId}/preview` : '';
   const downloadUrl = fileId ? `https://drive.google.com/uc?export=download&id=${fileId}` : '';
 
   const handleCopy = () => {
@@ -645,8 +631,7 @@ function GDriveConverter({ onConverted }) {
   return (
     <div className="gdrive-box">
       <div className="gdrive-box-title">
-        <span className="gdrive-icon">🔗</span>
-        Google Drive Link Converter
+        <span>🔗</span> Google Drive Link Converter
       </div>
       <div className="form-group">
         <label className="form-label">Paste your Google Drive share link</label>
@@ -661,39 +646,29 @@ function GDriveConverter({ onConverted }) {
       {fileId && (
         <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:6}}>
           <div className="gdrive-converted">
-            <span>✓ Embed (preview): {embedUrl.slice(0,55)}...</span>
+            <span>✓ File ID: {fileId}</span>
           </div>
           <div className="gdrive-converted">
-            <span>✓ Download: {downloadUrl.slice(0,55)}...</span>
+            <span>✓ Download URL ready</span>
             <button className="gdrive-copy-btn" onClick={handleCopy}>
               {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
-          <div style={{fontSize:'0.72rem', color:'var(--text-muted)', marginTop:2}}>
-            ✅ File ID detected: <code style={{color:'var(--blue-light)'}}>{fileId}</code> — preview + download ready
-          </div>
-        </div>
-      )}
-      {!fileId && input && !input.includes('drive.google.com') && (
-        <div style={{marginTop:8, fontSize:'0.75rem', color:'var(--text-muted)'}}>
-          ℹ️ Not a Google Drive link — will be used as-is
         </div>
       )}
     </div>
   );
 }
 
-// ─── VIDEO MODAL ─────────────────────────────────────
+// ─── VIDEO MODAL ──────────────────────────────────────────────────────────────
 function VideoModal({ clip, onClose }) {
-  const videoRef = useRef(null);
-
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
-  const isDemo = !clip.url || clip.fileType === 'demo';
+  const isDemo = !clip.url;
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -718,7 +693,7 @@ function VideoModal({ clip, onClose }) {
                 allowFullScreen
               />
             ) : (
-              <video ref={videoRef} controls autoPlay style={{width:'100%',height:'100%',objectFit:'contain'}}>
+              <video controls autoPlay style={{width:'100%',height:'100%',objectFit:'contain'}}>
                 <source src={clip.url} />
                 Your browser does not support this video format.
               </video>
@@ -727,8 +702,8 @@ function VideoModal({ clip, onClose }) {
             <>
               <FilmIcon />
               <div style={{textAlign:'center'}}>
-                <div style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>No video file attached</div>
-                <div style={{color:'var(--text-muted)', fontSize:'0.78rem', marginTop:4}}>Add a Google Drive link in the Admin Panel</div>
+                <div style={{color:'var(--text-secondary)', fontSize:'0.9rem'}}>{clip.title}</div>
+                <div style={{color:'var(--text-muted)', fontSize:'0.78rem', marginTop:4}}>No video URL attached</div>
               </div>
             </>
           )}
@@ -736,7 +711,9 @@ function VideoModal({ clip, onClose }) {
 
         <div className="modal-footer">
           <div className="modal-info">
-            {clip.tags?.map(t => <span key={t} className="clip-tag">{t}</span>)}
+            {clip.tags?.split(',').filter(Boolean).map(t => (
+              <span key={t} className="clip-tag">{t.trim()}</span>
+            ))}
             {clip.duration && <span style={{fontSize:'0.78rem', color:'var(--text-muted)'}}>⏱ {clip.duration}</span>}
           </div>
           {!isDemo ? (
@@ -754,11 +731,11 @@ function VideoModal({ clip, onClose }) {
   );
 }
 
-// ─── CLIP CARD ───────────────────────────────────────
+// ─── CLIP CARD ────────────────────────────────────────────────────────────────
 function ClipCard({ clip, onPlay, onDownload }) {
   const heroColor = HERO_COLORS[clip.hero] || '#2563eb';
-  const isDemo = !clip.url || clip.fileType === 'demo';
   const hasThumb = !!clip.thumb;
+  const tagList = clip.tags ? clip.tags.split(',').filter(Boolean) : [];
 
   return (
     <div className="clip-card" onClick={() => onPlay(clip)}>
@@ -768,22 +745,10 @@ function ClipCard({ clip, onPlay, onDownload }) {
             src={clip.thumb}
             alt={clip.title}
             style={{width:'100%',height:'100%',objectFit:'cover'}}
-            onError={e => {
-              e.target.style.display='none';
-              e.target.nextSibling.style.display='flex';
-            }}
+            onError={e => { e.target.style.display='none'; }}
           />
-        ) : null}
-        {(!hasThumb) && (
+        ) : (
           <div className="clip-thumb-placeholder" style={{background:`linear-gradient(135deg, ${heroColor}22, var(--navy-5))`}}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={heroColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{opacity:0.6}}>
-              <path d="M15 10l4.553-2.277A1 1 0 0 1 21 8.68V15.32a1 1 0 0 1-1.447.897L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
-            </svg>
-            <span style={{fontSize:'0.72rem', color:heroColor, opacity:0.7, fontWeight:600, letterSpacing:'0.08em'}}>{clip.hero}</span>
-          </div>
-        )}
-        {hasThumb && (
-          <div className="clip-thumb-placeholder" style={{display:'none', background:`linear-gradient(135deg, ${heroColor}22, var(--navy-5))`}}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={heroColor} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{opacity:0.6}}>
               <path d="M15 10l4.553-2.277A1 1 0 0 1 21 8.68V15.32a1 1 0 0 1-1.447.897L15 14M3 8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
             </svg>
@@ -803,7 +768,7 @@ function ClipCard({ clip, onPlay, onDownload }) {
         <div className="clip-title">{clip.title}</div>
         <div className="clip-meta">
           <div className="clip-tags">
-            {clip.tags?.slice(0,2).map(t => <span key={t} className="clip-tag">{t}</span>)}
+            {tagList.slice(0,2).map(t => <span key={t} className="clip-tag">{t.trim()}</span>)}
           </div>
           <button className="dl-btn" onClick={e => { e.stopPropagation(); onDownload(clip); }}>
             <DownloadIcon /> DL
@@ -814,28 +779,46 @@ function ClipCard({ clip, onPlay, onDownload }) {
   );
 }
 
-// ─── PUBLIC GALLERY ───────────────────────────────────
-function Gallery({ clips, onAdminClick }) {
+// ─── PUBLIC GALLERY ───────────────────────────────────────────────────────────
+function Gallery({ onAdminClick }) {
+  const [clips, setClips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dbOnline, setDbOnline] = useState(true);
   const [search, setSearch] = useState('');
   const [hero, setHero] = useState('All');
   const [selectedClip, setSelectedClip] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const fetchClips = async () => {
+    setLoading(true);
+    const { data, error } = await sb.from('clips').select('*').order('created_at', { ascending: false });
+    if (error) {
+      console.error(error);
+      setDbOnline(false);
+    } else {
+      setClips(data || []);
+      setDbOnline(true);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchClips(); }, []);
+
   const filtered = clips.filter(c => {
     const matchHero = hero === 'All' || c.hero === hero;
     const q = search.toLowerCase();
-    const matchSearch = !q || c.title.toLowerCase().includes(q) || c.hero.toLowerCase().includes(q) || c.tags?.some(t => t.toLowerCase().includes(q));
+    const matchSearch = !q || c.title.toLowerCase().includes(q) || c.hero.toLowerCase().includes(q) || (c.tags && c.tags.toLowerCase().includes(q));
     return matchHero && matchSearch;
   });
 
-  const heroesUsed = ['All', ...Array.from(new Set(clips.map(c => c.hero)))];
+  const heroesUsed = ['All', ...Array.from(new Set(clips.map(c => c.hero).filter(Boolean)))];
 
   const handleDownload = (clip) => {
-    if (clip.url && clip.fileType !== 'demo') {
+    if (clip.url) {
       window.open(clip.url, '_blank');
       setToast('Opening download link...');
     } else {
-      setToast('No file attached — add a Google Drive link via Admin Panel');
+      setToast('No file attached yet');
     }
   };
 
@@ -844,6 +827,10 @@ function Gallery({ clips, onAdminClick }) {
       <nav className="nav">
         <div className="nav-logo">WADE<span className="accent">MLBB</span>Clips</div>
         <div className="nav-right">
+          <span className={`db-badge ${dbOnline ? '' : 'offline'}`}>
+            <span style={{width:6,height:6,borderRadius:'50%',background:dbOnline?'#22c55e':'#ef4444',display:'inline-block'}}></span>
+            {dbOnline ? 'DB Live' : 'DB Offline'}
+          </span>
           <button className="nav-btn admin" onClick={onAdminClick}>Admin</button>
         </div>
       </nav>
@@ -859,7 +846,7 @@ function Gallery({ clips, onAdminClick }) {
           </div>
           <div className="stat-divider" />
           <div className="stat-item">
-            <div className="stat-num">{Array.from(new Set(clips.map(c=>c.hero))).length}</div>
+            <div className="stat-num">{Array.from(new Set(clips.map(c=>c.hero).filter(Boolean))).length}</div>
             <div className="stat-label">Heroes</div>
           </div>
           <div className="stat-divider" />
@@ -888,7 +875,12 @@ function Gallery({ clips, onAdminClick }) {
           <span className="section-count">{filtered.length} clips</span>
         </div>
         <div className="clip-grid">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Loading clips from database...</div>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">🎬</div>
               <h3>{clips.length === 0 ? 'No clips yet' : 'No clips found'}</h3>
@@ -906,7 +898,7 @@ function Gallery({ clips, onAdminClick }) {
   );
 }
 
-// ─── LOGIN ────────────────────────────────────────────
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
 function Login({ onLogin }) {
   const [pass, setPass] = useState('');
 
@@ -941,24 +933,31 @@ function Login({ onLogin }) {
             </div>
             <button type="submit" className="btn-primary" style={{marginTop:4}}>Unlock Dashboard</button>
           </form>
-          <p style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'1rem', textAlign:'center'}}>
-            Demo password: <code style={{color:'var(--blue-light)'}}>admin123</code>
-          </p>
         </div>
       </div>
     </>
   );
 }
 
-// ─── ADMIN DASHBOARD ─────────────────────────────────
-function Admin({ clips, setClips, onBack, onLogout }) {
+// ─── ADMIN DASHBOARD ──────────────────────────────────────────────────────────
+function Admin({ onBack, onLogout }) {
   const [page, setPage] = useState('dashboard');
+  const [clips, setClips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ title:'', hero:'', tags:'', url:'', thumb:'', duration:'', fileType:'url' });
+  const [form, setForm] = useState({ title:'', hero:'', tags:'', url:'', thumb:'', duration:'' });
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef(null);
 
-  const heroesWithClips = Array.from(new Set(clips.map(c => c.hero)));
+  const fetchClips = async () => {
+    setLoading(true);
+    const { data, error } = await sb.from('clips').select('*').order('created_at', { ascending: false });
+    if (!error) setClips(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchClips(); }, []);
 
   const showSwal = (opts) => Swal.fire({ background:'#0f1a30', color:'#e8eaf6', confirmButtonColor:'#2563eb', ...opts });
 
@@ -971,8 +970,7 @@ function Admin({ clips, setClips, onBack, onLogout }) {
   const handleFile = (f) => {
     if (!f) return;
     const url = URL.createObjectURL(f);
-    setForm(prev => ({ ...prev, url, fileType:'local' }));
-    showSwal({ icon:'warning', title:'Heads up!', html:`<div style="font-size:0.88rem;color:#8ba3c7">Local file uploads <b style="color:#fca5a5">disappear on refresh</b>.<br/><br/>Use a <b style="color:#60a5fa">Google Drive link</b> above for permanent storage.</div>`, confirmButtonText:'Got it' });
+    setForm(prev => ({ ...prev, url }));
   };
 
   const handleDrop = (e) => {
@@ -982,41 +980,67 @@ function Admin({ clips, setClips, onBack, onLogout }) {
   };
 
   const handleGDriveConverted = (url) => {
-    setForm(prev => ({ ...prev, url, fileType:'url' }));
+    setForm(prev => ({ ...prev, url }));
   };
 
-  const handleSubmit = () => {
-    if (!form.title || !form.hero) { showSwal({ icon:'warning', title:'Missing fields', text:'Title and Hero are required!' }); return; }
-    const tags = form.tags.split(',').map(t => t.trim()).filter(Boolean);
-    if (editId !== null) {
-      const updated = clips.map(c => c.id === editId ? { ...c, ...form, tags } : c);
-      setClips(updated); saveClips(updated);
-      setEditId(null); showToast('Clip updated!');
-    } else {
-      const newClip = { id: Date.now(), ...form, tags, date: new Date().toISOString().slice(0,10) };
-      const updated = [newClip, ...clips];
-      setClips(updated); saveClips(updated);
-      showSwal({ icon:'success', title:'Clip Added!', text:'Your MLBB clip is now live in the gallery.' });
+  const resetForm = () => {
+    setForm({ title:'', hero:'', tags:'', url:'', thumb:'', duration:'' });
+    setEditId(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!form.title || !form.hero) {
+      showSwal({ icon:'warning', title:'Missing fields', text:'Title and Hero are required!' });
+      return;
     }
-    setForm({ title:'', hero:'', tags:'', url:'', thumb:'', duration:'', fileType:'url' });
+    setSaving(true);
+    const payload = {
+      title: form.title,
+      hero: form.hero,
+      tags: form.tags,
+      url: form.url,
+      thumb: form.thumb,
+      duration: form.duration,
+      date: new Date().toISOString().slice(0,10),
+    };
+
+    if (editId !== null) {
+      const { error } = await sb.from('clips').update(payload).eq('id', editId);
+      if (error) { showSwal({ icon:'error', title:'Error', text: error.message }); }
+      else { showToast('Clip updated!'); resetForm(); await fetchClips(); }
+    } else {
+      const { error } = await sb.from('clips').insert([payload]);
+      if (error) { showSwal({ icon:'error', title:'Error', text: error.message }); }
+      else { showToast('Clip added to database! 🎉'); resetForm(); await fetchClips(); setPage('clips'); }
+    }
+    setSaving(false);
   };
 
   const handleDelete = (id) => {
     Swal.fire({
-      title:'Delete Clip?', text:"This can't be undone.", icon:'warning',
+      title:'Delete Clip?', text:"This removes it from the database permanently.", icon:'warning',
       showCancelButton:true, confirmButtonColor:'#ef4444', cancelButtonColor:'#2563eb',
       confirmButtonText:'Delete', background:'#0f1a30', color:'#e8eaf6'
-    }).then(r => {
+    }).then(async r => {
       if (r.isConfirmed) {
-        const updated = clips.filter(c => c.id !== id);
-        setClips(updated); saveClips(updated); showToast('Clip deleted.');
+        const { error } = await sb.from('clips').delete().eq('id', id);
+        if (error) showSwal({ icon:'error', title:'Error', text: error.message });
+        else { showToast('Clip deleted.'); await fetchClips(); }
       }
     });
   };
 
   const handleEdit = (clip) => {
-    setForm({ title:clip.title, hero:clip.hero, tags:clip.tags?.join(', ')||'', url:clip.url||'', thumb:clip.thumb||'', duration:clip.duration||'', fileType:clip.fileType||'url' });
-    setEditId(clip.id); setPage('upload');
+    setForm({
+      title: clip.title || '',
+      hero: clip.hero || '',
+      tags: clip.tags || '',
+      url: clip.url || '',
+      thumb: clip.thumb || '',
+      duration: clip.duration || '',
+    });
+    setEditId(clip.id);
+    setPage('upload');
   };
 
   const navItems = [
@@ -1030,16 +1054,20 @@ function Admin({ clips, setClips, onBack, onLogout }) {
       <nav className="nav">
         <div className="nav-logo" onClick={onBack} style={{cursor:'pointer'}}>
           WADE <span className="accent">MLBB</span>Clips
-          <span style={{fontSize:'0.7rem', color:'var(--blue-light)', marginLeft:8, fontWeight:400, letterSpacing:'0.08em'}}>Admin</span>
+          <span style={{fontSize:'0.7rem', color:'var(--blue-light)', marginLeft:8, fontWeight:400}}>Admin</span>
         </div>
         <div className="nav-right">
+          <span className="db-badge">
+            <span style={{width:6,height:6,borderRadius:'50%',background:'#22c55e',display:'inline-block'}}></span>
+            Supabase
+          </span>
           <button className="nav-btn" onClick={() => {
             Swal.fire({ title:'Go to Gallery?', icon:'question', showCancelButton:true, confirmButtonColor:'#2563eb', cancelButtonColor:'#64748b', confirmButtonText:'Yes', background:'#0f1a30', color:'#e8eaf6' })
             .then(r => { if (r.isConfirmed) onBack(); });
           }}>Gallery</button>
           <button className="nav-btn" onClick={() => {
             Swal.fire({ title:'Logout?', icon:'warning', showCancelButton:true, confirmButtonColor:'#ef4444', cancelButtonColor:'#2563eb', confirmButtonText:'Logout', background:'#0f1a30', color:'#e8eaf6' })
-            .then(r => { if (r.isConfirmed) { showToast('Logged out'); setTimeout(onLogout, 1000); } });
+            .then(r => { if (r.isConfirmed) { showToast('Logged out'); setTimeout(onLogout, 800); } });
           }}>Logout</button>
         </div>
       </nav>
@@ -1057,11 +1085,9 @@ function Admin({ clips, setClips, onBack, onLogout }) {
           <div className="admin-nav-item" onClick={() => setPage('clips')}>
             <span>🎬</span> All Clips ({clips.length})
           </div>
-          {heroesWithClips.slice(0,6).map(h => (
-            <div key={h} className="admin-nav-item" style={{fontSize:'0.82rem', paddingLeft:'2rem'}}>
-              {h} ({clips.filter(c=>c.hero===h).length})
-            </div>
-          ))}
+          <div style={{padding:'8px 1.25rem', fontSize:'0.75rem', color:'var(--text-muted)'}}>
+            🗄️ Supabase DB
+          </div>
         </aside>
 
         <main className="admin-main">
@@ -1070,52 +1096,25 @@ function Admin({ clips, setClips, onBack, onLogout }) {
           {page === 'dashboard' && (
             <>
               <div className="admin-page-title">Dashboard</div>
-              <div className="admin-page-sub">Overview of your MLBB Clips library</div>
+              <div className="admin-page-sub">Your MLBB Clips library — powered by Supabase</div>
+
               <div className="admin-metrics">
                 <div className="metric-card"><div className="metric-label">Total Clips</div><div className="metric-num">{clips.length}<span>+</span></div></div>
-                <div className="metric-card"><div className="metric-label">Heroes</div><div className="metric-num">{Array.from(new Set(clips.map(c=>c.hero))).length}</div></div>
-                <div className="metric-card"><div className="metric-label">With Video</div><div className="metric-num">{clips.filter(c => c.url && c.fileType !== 'demo').length}</div></div>
+                <div className="metric-card"><div className="metric-label">Heroes</div><div className="metric-num">{Array.from(new Set(clips.map(c=>c.hero).filter(Boolean))).length}</div></div>
+                <div className="metric-card"><div className="metric-label">Database</div><div className="metric-num" style={{fontSize:'1rem', color:'#86efac', paddingTop:6}}>🟢 Live</div></div>
               </div>
 
-              {/* GDrive helper */}
               <div className="form-card">
-                <h3>📎 How to add permanent clips</h3>
+                <h3>✅ Database Connected</h3>
                 <div style={{display:'flex', flexDirection:'column', gap:10, fontSize:'0.85rem', color:'var(--text-secondary)'}}>
-                  <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
-                    <span style={{color:'var(--blue-bright)', fontWeight:700, minWidth:20}}>1.</span>
-                    <span>Upload your MLBB clip to <strong style={{color:'var(--text-primary)'}}>Google Drive</strong></span>
-                  </div>
-                  <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
-                    <span style={{color:'var(--blue-bright)', fontWeight:700, minWidth:20}}>2.</span>
-                    <span>Right-click the file → <strong style={{color:'var(--text-primary)'}}>Share</strong> → set to <strong style={{color:'var(--text-primary)'}}>"Anyone with the link"</strong> → Copy link</span>
-                  </div>
-                  <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
-                    <span style={{color:'var(--blue-bright)', fontWeight:700, minWidth:20}}>3.</span>
-                    <span>Go to <strong style={{color:'var(--text-primary)'}}>Upload Clip</strong> → paste the link in the converter → fill details → Add Clip</span>
-                  </div>
-                  <div style={{display:'flex', alignItems:'flex-start', gap:10}}>
-                    <span style={{color:'var(--green)', fontWeight:700, minWidth:20}}>✓</span>
-                    <span style={{color:'var(--green)'}}>Clips will <strong>never disappear</strong> on refresh since the Google Drive URL is saved</span>
+                  <div style={{display:'flex', gap:10}}><span style={{color:'var(--green)', fontWeight:700, minWidth:20}}>✓</span><span>Clips are stored in <strong style={{color:'var(--text-primary)'}}>Supabase</strong> — visible to everyone instantly, no redeploy needed</span></div>
+                  <div style={{display:'flex', gap:10}}><span style={{color:'var(--green)', fontWeight:700, minWidth:20}}>✓</span><span>Add, edit, or delete clips from the <strong style={{color:'var(--text-primary)'}}>Admin Panel</strong> and they appear live immediately</span></div>
+                  <div style={{display:'flex', gap:10}}><span style={{color:'var(--green)', fontWeight:700, minWidth:20}}>✓</span><span>Use <strong style={{color:'var(--text-primary)'}}>Google Drive</strong> links for video hosting — paste the share link and the converter handles the rest</span></div>
+                  <div style={{marginTop:4, padding:'8px 12px', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:6, fontSize:'0.78rem', color:'#86efac'}}>
+                    🚀 Go to <strong>Upload Clip</strong> to add your first clip to the database!
                   </div>
                 </div>
               </div>
-
-              {clips.length > 0 && (
-                <div className="form-card">
-                  <h3>Recent Clips</h3>
-                  <div style={{display:'flex', flexDirection:'column', gap:8}}>
-                    {clips.slice(0,5).map(c => (
-                      <div key={c.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px solid var(--border)'}}>
-                        <div>
-                          <div style={{fontSize:'0.88rem', fontWeight:500, color:'var(--text-primary)'}}>{c.title}</div>
-                          <div style={{fontSize:'0.74rem', color:'var(--text-muted)'}}>{c.hero} · {c.date}</div>
-                        </div>
-                        <span className="table-badge">{c.fileType === 'demo' ? 'Demo' : c.url?.includes('drive.google') ? '🔗 GDrive' : '✓ Live'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -1123,37 +1122,30 @@ function Admin({ clips, setClips, onBack, onLogout }) {
           {page === 'upload' && (
             <>
               <div className="admin-page-title">{editId ? 'Edit Clip' : 'Upload New Clip'}</div>
-              <div className="admin-page-sub">{editId ? 'Modify clip details' : 'Add a new clip to the library'}</div>
+              <div className="admin-page-sub">{editId ? 'Modify clip details in the database' : 'Add a new clip — saved directly to Supabase'}</div>
 
-              {!editId && (
-                <div className="form-card">
-                  <h3>Video Source</h3>
-
-                  {/* GDrive Converter */}
-                  <GDriveConverter onConverted={handleGDriveConverted} />
-
-                  <div className="divider-text">— or drag & drop a local file (temporary) —</div>
-
-                  <div
-                    className={`file-drop ${dragging ? 'dragover' : ''}`}
-                    onClick={() => fileRef.current?.click()}
-                    onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                  >
-                    <div className="file-drop-icon">🎬</div>
-                    <p>{form.fileType === 'local' ? '✓ Local file selected (temporary — use GDrive for permanent)' : 'Drop video file here or click to browse'}</p>
-                    <small>MP4, MOV, WebM — disappears on refresh, use GDrive instead</small>
-                  </div>
-                  <input ref={fileRef} type="file" accept="video/*" style={{display:'none'}} onChange={e => handleFile(e.target.files[0])} />
-
-                  {form.url && (
-                    <div style={{marginTop:10, padding:'8px 12px', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:6, fontSize:'0.78rem', color:'#86efac'}}>
-                      ✓ URL set: {form.url.slice(0,60)}{form.url.length > 60 ? '...' : ''}
-                    </div>
-                  )}
+              <div className="form-card">
+                <h3>Video Source</h3>
+                <GDriveConverter onConverted={handleGDriveConverted} />
+                <div className="divider-text">— or drag & drop a local file (preview only) —</div>
+                <div
+                  className={`file-drop ${dragging ? 'dragover' : ''}`}
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={handleDrop}
+                >
+                  <div className="file-drop-icon">🎬</div>
+                  <p>Drop video file here or click to browse</p>
+                  <small>MP4, MOV, WebM (use Google Drive for permanent storage)</small>
                 </div>
-              )}
+                <input ref={fileRef} type="file" accept="video/*" style={{display:'none'}} onChange={e => handleFile(e.target.files[0])} />
+                {form.url && (
+                  <div style={{marginTop:10, padding:'8px 12px', background:'rgba(34,197,94,0.08)', border:'1px solid rgba(34,197,94,0.2)', borderRadius:6, fontSize:'0.78rem', color:'#86efac'}}>
+                    ✓ URL: {form.url.slice(0,80)}{form.url.length > 80 ? '...' : ''}
+                  </div>
+                )}
+              </div>
 
               <div className="form-card">
                 <h3>Clip Details</h3>
@@ -1178,35 +1170,31 @@ function Admin({ clips, setClips, onBack, onLogout }) {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="https://drive.google.com/file/d/... or any image link"
+                      placeholder="https://... (Imgur, Discord CDN, or Google Drive image link)"
                       value={form.thumb}
                       onChange={e => {
                         let val = e.target.value;
-                        // Auto-convert GDrive thumb link to direct image URL
                         const thumbId = extractGDriveId(val);
                         if (thumbId) val = `https://lh3.googleusercontent.com/d/${thumbId}`;
                         setForm(p => ({...p, thumb: val}));
                       }}
                     />
                     {form.thumb && (
-                      <div style={{marginTop:8, borderRadius:6, overflow:'hidden', border:'1px solid var(--border)', height:120, display:'flex', alignItems:'center', justifyContent:'center', background:'var(--navy-3)'}}>
-                        <img src={form.thumb} alt="thumb preview" style={{height:'100%', width:'100%', objectFit:'cover'}} onError={e => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-                        <div style={{display:'none', alignItems:'center', justifyContent:'center', width:'100%', height:'100%', fontSize:'0.78rem', color:'var(--text-muted)', flexDirection:'column', gap:6}}>
-                          <span>⚠️ Image failed to load</span>
-                          <span style={{fontSize:'0.7rem'}}>Try a different image host (Imgur, Discord, etc.)</span>
-                        </div>
+                      <div style={{marginTop:8, borderRadius:6, overflow:'hidden', border:'1px solid var(--border)', height:100}}>
+                        <img src={form.thumb} alt="preview" style={{width:'100%', height:'100%', objectFit:'cover'}} onError={e => e.target.style.display='none'} />
                       </div>
                     )}
-                    <span style={{fontSize:'0.72rem', color:'var(--text-muted)'}}>💡 Paste a Google Drive image link — auto-converts. Or use Imgur / Discord image links for best results.</span>
                   </div>
                   <div className="form-group" style={{gridColumn:'1/-1'}}>
-                    <label className="form-label">IGN</label>
-                    <input type="text" className="form-input" value={form.tags} onChange={e => setForm(p => ({...p, tags:e.target.value}))} />
+                    <label className="form-label">IGN (comma separated)</label>
+                    <input type="text" className="form-input" placeholder="Player name(s), comma separated" value={form.tags} onChange={e => setForm(p => ({...p, tags:e.target.value}))} />
                   </div>
                 </div>
                 <div style={{display:'flex', gap:10, marginTop:4}}>
-                  <button className="btn-primary" onClick={handleSubmit}>{editId ? '✓ Save Changes' : '+ Add Clip'}</button>
-                  {editId && <button className="nav-btn" onClick={() => { setEditId(null); setForm({title:'',hero:'',tags:'',url:'',thumb:'',duration:'',fileType:'url'}); }}>Cancel</button>}
+                  <button className="btn-primary" onClick={handleSubmit} disabled={saving}>
+                    {saving ? '⏳ Saving...' : editId ? '✓ Save Changes' : '+ Add to Database'}
+                  </button>
+                  {editId && <button className="nav-btn" onClick={resetForm}>Cancel</button>}
                 </div>
               </div>
             </>
@@ -1216,8 +1204,13 @@ function Admin({ clips, setClips, onBack, onLogout }) {
           {page === 'clips' && (
             <>
               <div className="admin-page-title">Manage Clips</div>
-              <div className="admin-page-sub">{clips.length} clips in library</div>
-              {clips.length === 0 ? (
+              <div className="admin-page-sub">{clips.length} clips in Supabase database</div>
+              {loading ? (
+                <div style={{textAlign:'center', padding:'4rem 2rem'}}>
+                  <div className="spinner" style={{margin:'0 auto 1rem'}}></div>
+                  <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>Loading from database...</div>
+                </div>
+              ) : clips.length === 0 ? (
                 <div style={{textAlign:'center', padding:'4rem 2rem', color:'var(--text-muted)'}}>
                   <div style={{fontSize:'2rem', marginBottom:'1rem'}}>🎬</div>
                   <div>No clips yet. Add one via Upload Clip.</div>
@@ -1235,16 +1228,16 @@ function Admin({ clips, setClips, onBack, onLogout }) {
                         <tr key={c.id}>
                           <td className="table-title">{c.title}</td>
                           <td><span className="table-badge">{c.hero}</span></td>
-                          <td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{c.tags?.slice(0,2).map(t=><span key={t} className="clip-tag">{t}</span>)}</div></td>
-                          <td>{c.duration||'—'}</td>
+                          <td><span style={{fontSize:'0.8rem', color:'var(--text-secondary)'}}>{c.tags || '—'}</span></td>
+                          <td>{c.duration || '—'}</td>
                           <td>
                             <span style={{
                               fontSize:'0.7rem', padding:'2px 7px', borderRadius:3,
-                              background: c.url?.includes('drive.google') ? 'rgba(34,197,94,0.1)' : c.fileType==='demo' ? 'rgba(239,68,68,0.1)' : 'rgba(96,165,250,0.1)',
-                              border: `1px solid ${c.url?.includes('drive.google') ? 'rgba(34,197,94,0.25)' : c.fileType==='demo' ? 'rgba(239,68,68,0.25)' : 'rgba(96,165,250,0.25)'}`,
-                              color: c.url?.includes('drive.google') ? '#86efac' : c.fileType==='demo' ? '#fca5a5' : '#93c5fd',
+                              background: c.url?.includes('drive.google') ? 'rgba(34,197,94,0.1)' : 'rgba(96,165,250,0.1)',
+                              border: `1px solid ${c.url?.includes('drive.google') ? 'rgba(34,197,94,0.25)' : 'rgba(96,165,250,0.25)'}`,
+                              color: c.url?.includes('drive.google') ? '#86efac' : '#93c5fd',
                             }}>
-                              {c.url?.includes('drive.google') ? '🔗 GDrive' : c.fileType==='demo' ? 'No File' : '📁 Local'}
+                              {c.url?.includes('drive.google') ? '🔗 GDrive' : c.url ? '🌐 URL' : '❌ None'}
                             </span>
                           </td>
                           <td>
@@ -1261,16 +1254,16 @@ function Admin({ clips, setClips, onBack, onLogout }) {
               )}
             </>
           )}
+
         </main>
       </div>
     </>
   );
 }
 
-// ─── APP ROOT ─────────────────────────────────────────
+// ─── APP ROOT ─────────────────────────────────────────────────────────────────
 function App() {
   const [view, setView] = useState('gallery');
-  const [clips, setClips] = useState(getClips);
   const [authed, setAuthed] = useState(false);
 
   const handleAdminClick = () => {
@@ -1280,9 +1273,14 @@ function App() {
 
   return (
     <div>
-      {view === 'gallery' && <Gallery clips={clips} onAdminClick={handleAdminClick} />}
+      {view === 'gallery' && <Gallery onAdminClick={handleAdminClick} />}
       {view === 'login' && <Login onLogin={() => { setAuthed(true); setView('admin'); }} />}
-      {view === 'admin' && <Admin clips={clips} setClips={setClips} onBack={() => setView('gallery')} onLogout={() => { setAuthed(false); setView('gallery'); }} />}
+      {view === 'admin' && (
+        <Admin
+          onBack={() => setView('gallery')}
+          onLogout={() => { setAuthed(false); setView('gallery'); }}
+        />
+      )}
     </div>
   );
 }

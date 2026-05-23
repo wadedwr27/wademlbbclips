@@ -286,23 +286,12 @@
   .modal-close:hover { background: var(--red); color: #fff; border-color: var(--red); }
 
   .modal-video {
-    width: 100%; 
-    aspect-ratio: 16/9; 
-    background: #000;
-    display: flex; 
-    align-items: center; 
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
+    width: 100%; aspect-ratio: 16/9; background: #000;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); font-size: 0.9rem; flex-direction: column; gap: 12px;
   }
 
-  .modal-video video, 
-  .modal-video iframe {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: contain;
-    background: #000;
-  }
+  .modal-video video { width: 100%; height: 100%; object-fit: contain; }
 
   .modal-footer {
     padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;
@@ -504,32 +493,6 @@
 
   /* ── MOBILE PHONE IMPROVEMENTS (480px and below) ── */
   @media (max-width: 480px) {
-    .modal-video {
-      aspect-ratio: 16/9;
-      min-height: 45vh;           /* Give more space on phones */
-      max-height: 55vh;
-    }
-
-    .modal-video video,
-    .modal-video iframe {
-      object-fit: contain;
-      background: #111;
-    }
-
-    /* Force video controls to be visible and at bottom */
-    .modal-video video::-webkit-media-controls {
-      background: rgba(0,0,0,0.85) !important;
-    }
-  }
-
-  .modal-content {
-    max-height: 95vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .modal-video {
-    flex: 1;
 
     /* Nav — tighter, prevent overflow */
     .nav {
@@ -908,19 +871,14 @@ function VideoModal({ clip, onClose }) {
           {!isDemo ? (
             isGDriveLink(clip.url) ? (
               <iframe
-              src={getGDriveEmbedUrl(clip.url)}
-              style={{width:'100%', height:'100%', border:'none', background:'#000'}}
-              allow="autoplay; fullscreen"
-              allowFullScreen
+                src={getGDriveEmbedUrl(clip.url)}
+                style={{width:'100%', height:'100%', border:'none'}}
+                allow="autoplay"
+                allowFullScreen
               />
             ) : (
-              <video 
-                controls 
-                autoPlay 
-                style={{width:'100%', height:'100%', objectFit:'contain', background:'#000'}}
-                playsInline   /* Important for mobile */
-              >
-                <source src={clip.url} type="video/mp4" />
+              <video controls autoPlay style={{width:'100%',height:'100%',objectFit:'contain'}}>
+                <source src={clip.url} />
                 Your browser does not support this video format.
               </video>
             )

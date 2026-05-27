@@ -257,18 +257,25 @@
 
   /* ── MODAL ── */
   .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.88); backdrop-filter: blur(8px);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92); backdrop-filter: blur(10px);
     z-index: 200;
     display: flex; align-items: center; justify-content: center;
-    padding: 2rem;
+    padding: 1.25rem;
     animation: fadeIn 0.15s ease;
+    /* Ensure the flex container itself fills the screen and centers */
+    min-height: 100dvh;
+    min-height: 100vh;
   }
 
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
   .modal-content {
-    background: var(--navy-card); border: 1px solid var(--border-hover); border-radius: 12px;
+    background: var(--navy-card); border: 1px solid var(--border-hover); border-radius: 14px;
     width: 100%; max-width: 800px; overflow: hidden; animation: slideUp 0.2s ease;
+    /* Never taller than screen */
+    max-height: calc(100vh - 2.5rem);
+    max-height: calc(100dvh - 2.5rem);
+    display: flex; flex-direction: column;
   }
 
   @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -288,17 +295,84 @@
 
   .modal-close:hover { background: var(--red); color: #fff; border-color: var(--red); }
 
-  /* ── VIDEO AREA — fixed brightness & centering ── */
+  /* ── VIDEO AREA — custom player, controls always at bottom ── */
   .modal-video {
     width: 100%;
     aspect-ratio: 16/9;
     background: #000;
     position: relative;
     overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
   }
 
-  /* iframe gets full coverage, no dark shrinking */
+  /* The actual <video> element fills the box */
+  .modal-video video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+
+  /* ── CUSTOM VIDEO CONTROLS (bottom bar) ── */
+  .vid-controls {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    padding: 20px 12px 10px;
+    display: flex; flex-direction: column; gap: 6px;
+    z-index: 10;
+    opacity: 1;
+    transition: opacity 0.3s;
+  }
+
+  .vid-scrubber {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.25);
+    outline: none;
+    cursor: pointer;
+    accent-color: var(--blue-bright);
+  }
+  .vid-scrubber::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--blue-bright);
+    cursor: pointer;
+    box-shadow: 0 0 4px rgba(30,144,255,0.6);
+  }
+  .vid-scrubber::-moz-range-thumb {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--blue-bright);
+    border: none;
+    cursor: pointer;
+  }
+
+  .vid-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .vid-btn {
+    background: none; border: none; cursor: pointer;
+    color: #fff; padding: 4px; display: flex; align-items: center; justify-content: center;
+    opacity: 0.9; transition: opacity 0.15s; flex-shrink: 0;
+  }
+  .vid-btn:hover { opacity: 1; }
+
+  .vid-time {
+    font-size: 0.72rem; color: rgba(255,255,255,0.8);
+    font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0;
+  }
+
+  .vid-spacer { flex: 1; }
+
+  /* GDrive iframe fallback (no custom controls) */
   .modal-video iframe {
     position: absolute;
     inset: 0;
@@ -309,19 +383,11 @@
     background: #000;
   }
 
-  /* native video also fills the box */
-  .modal-video video {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
   /* placeholder text (no url) */
   .modal-video .video-placeholder {
+    position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 12px; color: var(--text-muted); font-size: 0.9rem; z-index: 1;
+    gap: 12px; color: var(--text-muted); font-size: 0.9rem;
   }
 
   .modal-footer {
@@ -623,21 +689,39 @@
       padding: 0.75rem;
       align-items: center;
       justify-content: center;
+      /* Lock the backdrop to fill screen fully */
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
     }
 
     .modal-content {
       border-radius: 12px;
       max-width: 100%;
       width: 100%;
-      /* Let it size naturally, no forced max-height that pushes it off center */
-      max-height: 90vh;
-      overflow-y: auto;
-      /* Ensure it stays centered — don't let it drift */
-      margin: auto;
-      position: relative;
+      max-height: 88vh;
+      max-height: 88dvh;
+      overflow: hidden;
+      margin: 0;
+      /* Ensure flex column so header+video+footer stack */
+      display: flex;
+      flex-direction: column;
     }
 
-    .modal-header { padding: 12px 14px; }
+    /* Video area: fixed aspect ratio on mobile */
+    .modal-video {
+      aspect-ratio: 16/9;
+      flex-shrink: 0;
+    }
+
+    /* Scrubber thumb bigger for touch */
+    .vid-scrubber::-webkit-slider-thumb {
+      width: 18px;
+      height: 18px;
+    }
+    .vid-scrubber { height: 5px; }
+    .vid-btn { padding: 6px; }
+
+    .modal-header { padding: 12px 14px; flex-shrink: 0; }
     .modal-title { font-size: 0.95rem; }
 
     /* Modal footer — row layout, DL button always shows label */
@@ -904,10 +988,17 @@ function GDriveConverter({ onConverted }) {
 
 // ─── VIDEO MODAL ──────────────────────────────────────────────────────────────
 function VideoModal({ clip, onClose }) {
+  const videoRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [muted, setMuted] = useState(false);
+  const [useIframe, setUseIframe] = useState(false);
+
   useEffect(() => {
     const handleKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleKey);
-    // Prevent body scroll while modal is open
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleKey);
@@ -915,11 +1006,93 @@ function VideoModal({ clip, onClose }) {
     };
   }, []);
 
+  // For GDrive: try to load as direct video first, fallback to iframe
+  const getVideoSrc = (url) => {
+    if (!url) return null;
+    const fileId = extractGDriveId(url);
+    if (fileId) return `https://drive.google.com/uc?export=view&id=${fileId}`;
+    return url;
+  };
+
   const isDemo = !clip.url;
+  const gdrive = isGDriveLink(clip.url);
+  const videoSrc = getVideoSrc(clip.url);
+
+  const fmt = (s) => {
+    if (!s || isNaN(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+  };
+
+  const handleTimeUpdate = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    setCurrentTime(v.currentTime);
+    setDuration(v.duration || 0);
+    setProgress(v.duration ? (v.currentTime / v.duration) * 100 : 0);
+  };
+
+  const handlePlayPause = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) { v.play(); setPlaying(true); }
+    else { v.pause(); setPlaying(false); }
+  };
+
+  const handleScrub = (e) => {
+    const v = videoRef.current;
+    if (!v || !v.duration) return;
+    const val = parseFloat(e.target.value);
+    v.currentTime = (val / 100) * v.duration;
+    setProgress(val);
+  };
+
+  const handleMute = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = !v.muted;
+    setMuted(v.muted);
+  };
+
+  const handleFullscreen = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.requestFullscreen) v.requestFullscreen();
+    else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+    else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+  };
+
+  const handleVideoError = () => {
+    // If direct video load fails, fall back to GDrive iframe
+    if (gdrive) setUseIframe(true);
+  };
+
+  const PlayIcon = () => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none"><path d="M5 3l14 9-14 9V3z"/></svg>
+  );
+  const PauseIcon = () => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+  );
+  const MuteIcon = ({ muted }) => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {muted
+        ? <><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></>
+        : <><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></>
+      }
+    </svg>
+  );
+  const FullscreenIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+    </svg>
+  );
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-content">
+
+        {/* Header */}
         <div className="modal-header">
           <div>
             <div style={{fontSize:'0.7rem', color:'var(--gold)', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:3}}>
@@ -932,24 +1105,7 @@ function VideoModal({ clip, onClose }) {
 
         {/* ── VIDEO AREA ── */}
         <div className="modal-video">
-          {!isDemo ? (
-            isGDriveLink(clip.url) ? (
-              /* Google Drive iframe — fills the container absolutely */
-              <iframe
-                src={getGDriveEmbedUrl(clip.url)}
-                allow="autoplay; fullscreen"
-                allowFullScreen
-                loading="eager"
-                title={clip.title}
-              />
-            ) : (
-              /* Native video — also fills absolutely via CSS */
-              <video controls autoPlay>
-                <source src={clip.url} />
-                Your browser does not support this video format.
-              </video>
-            )
-          ) : (
+          {isDemo ? (
             <div className="video-placeholder">
               <FilmIcon />
               <div style={{textAlign:'center'}}>
@@ -957,9 +1113,65 @@ function VideoModal({ clip, onClose }) {
                 <div style={{color:'var(--text-muted)', fontSize:'0.78rem', marginTop:4}}>No video URL attached</div>
               </div>
             </div>
+          ) : useIframe ? (
+            /* GDrive iframe fallback — only if direct video failed */
+            <iframe
+              src={getGDriveEmbedUrl(clip.url)}
+              allow="autoplay; fullscreen"
+              allowFullScreen
+              loading="eager"
+              title={clip.title}
+            />
+          ) : (
+            /* ── CUSTOM HTML5 PLAYER ── */
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted={muted}
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={handleTimeUpdate}
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onError={handleVideoError}
+                onClick={handlePlayPause}
+                style={{cursor:'pointer'}}
+              >
+                <source src={videoSrc} />
+              </video>
+
+              {/* Controls at bottom */}
+              <div className="vid-controls">
+                {/* Scrub bar */}
+                <input
+                  type="range"
+                  className="vid-scrubber"
+                  min="0" max="100"
+                  value={progress}
+                  onChange={handleScrub}
+                  onClick={e => e.stopPropagation()}
+                />
+                {/* Row: play/pause · time · spacer · mute · fullscreen */}
+                <div className="vid-row">
+                  <button className="vid-btn" onClick={e => { e.stopPropagation(); handlePlayPause(); }}>
+                    {playing ? <PauseIcon /> : <PlayIcon />}
+                  </button>
+                  <span className="vid-time">{fmt(currentTime)} / {fmt(duration)}</span>
+                  <div className="vid-spacer" />
+                  <button className="vid-btn" onClick={e => { e.stopPropagation(); handleMute(); }}>
+                    <MuteIcon muted={muted} />
+                  </button>
+                  <button className="vid-btn" onClick={e => { e.stopPropagation(); handleFullscreen(); }}>
+                    <FullscreenIcon />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
 
+        {/* Footer */}
         <div className="modal-footer">
           <div className="modal-info">
             {clip.ign && clip.ign.trim() ? (
@@ -979,6 +1191,7 @@ function VideoModal({ clip, onClose }) {
             </span>
           )}
         </div>
+
       </div>
     </div>
   );
